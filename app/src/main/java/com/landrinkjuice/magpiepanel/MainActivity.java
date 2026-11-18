@@ -176,11 +176,8 @@ public class MainActivity extends Activity {
                 final AtomicBoolean disposed = new AtomicBoolean(false);
                 final Runnable dispose = () -> {
                     if (disposed.compareAndSet(false, true)) {
-                        main.post(() -> {
-                            if (!p.isDestroyed()) {
-                                p.destroy();
-                            }
-                        });
+                        // AtomicBoolean 保证只销毁一次；WebView.destroy() 幂等语义由其内部守卫兜底
+                        main.post(p::destroy);
                     }
                 };
                 p.setWebViewClient(new WebViewClient() {
@@ -301,7 +298,7 @@ public class MainActivity extends Activity {
         if (u.getHost() == null) {
             return DEFAULT_URL;
         }
-        return u.buildUpon().clearQuery().clearFragment().build().toString();
+        return u.buildUpon().clearQuery().fragment(null).build().toString();
     }
 
     private void loadPanel() {
