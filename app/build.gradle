@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+def vCode = (project.findProperty('VERSION_CODE') ?: '1').toString().toInteger()
+def vName = (project.findProperty('VERSION_NAME') ?: '1.0.0').toString()
+
+// 签名：密钥与口令全部来自环境变量（GitHub Actions Secrets 注入），仓库不含任何机密。
+def ksPath = System.getenv('MAGPIE_KEYSTORE')
+def ksOk = ksPath != null && new File(ksPath).exists()
+
+android {
+    namespace 'com.landrinkjuice.magpiepanel'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.landrinkjuice.magpiepanel"
+        minSdk 29
+        targetSdk 34
+        versionCode vCode
+        versionName vName
+    }
+
+    if (ksOk) {
+        signingConfigs {
+            release {
+                storeFile file(ksPath)
+                storePassword System.getenv('MAGPIE_KS_PASS')
+                keyAlias System.getenv('MAGPIE_KS_ALIAS')
+                keyPassword System.getenv('MAGPIE_KEY_PASS')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (ksOk) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError true
+    }
+}

@@ -1,0 +1,78 @@
+name: build-apk
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: '版本名（如 1.0.0）'
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Decode keystore
+        env:
+          KS_B64: ${{ secrets.MAGPIE_KEYSTORE_B64 }}
+        run: printf '%s' "$KS_B64" | base64 -d > "$RUNNER_TEMP/magpie-release.jks"
+
+      - name: Build release APK
+        env:
+          MAGPIE_KEYSTORE: ${{ runner.temp }}/magpie-release.jks
+          MAGPIE_KS_PASS: ${{ secrets.MAGPIE_KS_PASS }}
+          MAGPIE_KEY_PASS: ${{ secrets.MAGPIE_KEY_PASS }}
+          MAGPIE_KS_ALIAS: magpie
+          INPUT_VN: ${{ inputs.version_name }}
+        run: |
+          VN="${INPUT_VN:-1.0.0}"
+          VC="$(date -u +%y%m%d%H)"
+          echo "Building v${VN} (code ${VC})"
+          gradle --no-daemon -PVERSION_CODE="$VC" -PVERSION_NAME="$VN" assembleRelease
+
+      - name: Check APK exists and signed
+        run: |
+          ls -la app/build/outputs/apk/release/
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | head -1)"
+          if ! "$APKSIGNER" verify --print-certs "$APK"; then
+            echo "APK signature verification FAILED"; exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: magpie-panel-apk
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Create release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VN: ${{ inputs.version_name }}
+        run: |
+          VN="${INPUT_VN:-1.0.0}"
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -1)"
+          cp "$APK" "magpie-panel-v${VN}.apk"
+          TAG="v${VN}"
+          DATE_TAG="$(date -u +%Y%m%d-%H%M)"
+          gh release create "$TAG" "magpie-panel-v${VN}.apk" \
+            --title "Magpie Panel ${TAG}" \
+            --notes "Magpie 网关面板壳 v${VN}，构建于 UTC ${DATE_TAG}。" \
+            --prerelease=false || \
+          gh release upload "$TAG" "magpie-panel-v${VN}.apk" --clobber

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="win_bg">#F4F4F6</color>
+    <color name="fg_main">#1C1C1E</color>
+    <color name="fg_sub">#6E6E73</color>
+    <color name="accent">#0A84FF</color>
+</resources>
