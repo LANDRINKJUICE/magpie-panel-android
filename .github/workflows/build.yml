@@ -22,7 +22,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # ubuntu-latest 自带 Android SDK（/usr/local/lib/android/sdk，许可已接受），
+      # 无需 setup-android；AGP 会自动补装缺失组件。
 
       - uses: gradle/actions/setup-gradle@v4
         with:
